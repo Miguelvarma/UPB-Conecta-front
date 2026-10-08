@@ -18,13 +18,10 @@ import java.io.IOException
  * este front — el resto sigue en `Fake*` hasta que su contexto tenga
  * endpoint propio (ver `ARQUITECTURA-INTEGRACION.md`).
  *
- * Vacío importante que todavía no resuelve este repositorio: el backend NO
- * devuelve ningún rol en la respuesta de login (su `Role` solo distingue
- * `student`/`content-admin`, sin `PROFESOR`, y `AuthenticationResult` ni
- * siquiera expone ese campo). Por eso todo login por esta vía entra como
- * [RolUsuario.ESTUDIANTE] — el flujo profesor↔estudiante sigue probándose
- * solo con [FakeAuthRepository] hasta que el equipo de backend agregue el
- * rol al contrato.
+ * El rol viaja en `role` de la respuesta de login ("student" |
+ * "professor" | "content-admin") y se traduce con [aRolUsuario]: así el
+ * flujo profesor↔estudiante se prueba contra el backend real con las
+ * cuentas de prueba de profesor (p. ej. `profesor@upb.edu.co`).
  */
 class HttpAuthRepository(
     private val api: AuthApiService,
@@ -44,7 +41,7 @@ class HttpAuthRepository(
             when {
                 respuesta.isSuccessful && cuerpo?.ok == true && cuerpo.profile != null -> {
                     cuerpo.session?.let { SessionStore.guardar(it.accessToken.value, it.refreshToken.value) }
-                    val usuario = cuerpo.profile.aUsuario()
+                    val usuario = cuerpo.profile.aUsuario(aRolUsuario(cuerpo.role))
                     usuarioRepository.establecerUsuarioActual(usuario)
                     ResultadoLogin.Exito(usuario)
                 }
@@ -82,7 +79,7 @@ class HttpAuthRepository(
  * [Programa] "de paso" con ese mismo nombre en vez de bloquear el login:
  * un programa no reconocido en la UI es preferible a no poder entrar.
  */
-private fun PerfilDto.aUsuario(): Usuario {
+private fun PerfilDto.aUsuario(rol: RolUsuario): Usuario {
     val programa = MockProgramas.todos.firstOrNull { it.nombre.equals(program, ignoreCase = true) }
         ?: Programa(id = program.lowercase().replace(" ", "-"), nombre = program, facultad = "")
 
@@ -91,9 +88,22 @@ private fun PerfilDto.aUsuario(): Usuario {
         nombre = name,
         correoInstitucional = email,
         programa = programa,
-        semestre = semester,
+        // Un profesor no tiene semestre; 0 es la misma convención que ya usa
+        // `MockData.usuarioProfesor`, y la UI no lo muestra para ese rol.
+        semestre = semester ?: 0,
         identidadVerificada = true,
-        // Ver nota de clase: el backend todavía no distingue profesor/estudiante.
-        rol = RolUsuario.ESTUDIANTE
+        rol = rol
     )
 }
+
+/**
+ * Traduce el rol del backend al [RolUsuario] de este front. El front solo
+ * distingue estudiante y profesor: "content-admin" (o un rol que el backend
+ * agregue después) entra como [RolUsuario.ESTUDIANTE], que es el que menos
+ * permisos tiene en la app — nunca se asciende a profesor por omisión.
+ */
+private fun aRolUsuario(role: String?): RolUsuario =
+    when (role) {
+        "professor" -> RolUsuario.PROFESOR
+        else -> RolUsuario.ESTUDIANTE
+    }

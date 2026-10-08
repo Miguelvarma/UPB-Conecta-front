@@ -16,7 +16,7 @@ data class LoginRequestDto(
 /**
  * La respuesta es una unión discriminada por `ok` (igual que
  * `AuthenticationResult` en el backend): con `ok = true` llegan `profile`,
- * `session` y `consent`; con `ok = false` llega `error` (uno de
+ * `role`, `session` y `consent`; con `ok = false` llega `error` (uno de
  * "invalid-credentials" | "provider-unavailable" | "rate-limited") y
  * `message` explica cualquiera de los dos casos. Todos los campos que no
  * aplican a la rama recibida quedan en `null`.
@@ -25,6 +25,11 @@ data class LoginResponseDto(
     val ok: Boolean,
     val message: String,
     val profile: PerfilDto? = null,
+    /**
+     * Rol vigente de la cuenta: "student" | "professor" | "content-admin".
+     * Opcional para tolerar un backend anterior que no lo enviaba.
+     */
+    val role: String? = null,
     val session: SesionDto? = null,
     val consent: ConsentimientoDto? = null,
     val error: String? = null
@@ -34,7 +39,8 @@ data class PerfilDto(
     val name: String,
     val email: String,
     val program: String,
-    val semester: Int,
+    /** Solo estudiantes: el backend no lo envía para un profesor. */
+    val semester: Int? = null,
     val studentId: String? = null
 )
 
