@@ -326,8 +326,7 @@ object AppContainer {
     // HttpAuthRepository y NetworkModule.BASE_URL). Requiere tener
     // `npm run start:http` corriendo en el backend; si no está disponible,
     // comenta esta línea y descomenta la de abajo para volver a probar solo
-    // con datos simulados (p. ej. para probar el rol de profesor, que el
-    // backend todavía no distingue — ver la nota en HttpAuthRepository).
+    // con datos simulados.
     val authRepository: AuthRepository = HttpAuthRepository(NetworkModule.authApi, usuarioRepository)
     // val authRepository: AuthRepository = FakeAuthRepository(usuarioRepository)
 
