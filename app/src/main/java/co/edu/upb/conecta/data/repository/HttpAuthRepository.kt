@@ -3,6 +3,7 @@ package co.edu.upb.conecta.data.repository
 import co.edu.upb.conecta.data.network.AuthApiService
 import co.edu.upb.conecta.data.network.LoginRequestDto
 import co.edu.upb.conecta.data.network.LoginResponseDto
+import co.edu.upb.conecta.data.network.NetworkModule
 import co.edu.upb.conecta.data.network.PerfilDto
 import co.edu.upb.conecta.data.network.RefreshRequestDto
 import co.edu.upb.conecta.data.network.SessionStore
@@ -10,6 +11,7 @@ import co.edu.upb.conecta.domain.model.MockProgramas
 import co.edu.upb.conecta.domain.model.Programa
 import co.edu.upb.conecta.domain.model.RolUsuario
 import co.edu.upb.conecta.domain.model.Usuario
+import retrofit2.Response
 import java.io.IOException
 
 /**
@@ -37,7 +39,10 @@ class HttpAuthRepository(
 
         return try {
             val respuesta = api.iniciarSesion(LoginRequestDto(username = correo, password = contrasena))
-            val cuerpo = respuesta.body()
+            // En 4xx/5xx Retrofit deja el JSON `{ ok:false, error, message }`
+            // en errorBody(), no en body(): sin leerlo, una contraseña
+            // incorrecta (401) se mostraba como "código 401".
+            val cuerpo = respuesta.body() ?: leerCuerpoDeError(respuesta)
 
             when {
                 respuesta.isSuccessful && cuerpo?.ok == true && cuerpo.profile != null -> {
@@ -78,6 +83,15 @@ class HttpAuthRepository(
             }
         }
     }
+
+    private fun leerCuerpoDeError(respuesta: Response<LoginResponseDto>): LoginResponseDto? =
+        try {
+            respuesta.errorBody()?.string()?.let {
+                NetworkModule.moshi.adapter(LoginResponseDto::class.java).fromJson(it)
+            }
+        } catch (error: Exception) {
+            null
+        }
 
     private fun mensajeDeError(cuerpo: LoginResponseDto): String =
         when (cuerpo.error) {
