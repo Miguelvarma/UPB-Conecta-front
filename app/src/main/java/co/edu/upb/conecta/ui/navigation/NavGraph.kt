@@ -23,6 +23,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +58,8 @@ import co.edu.upb.conecta.ui.screens.notificaciones.NotificacionesScreen
 import co.edu.upb.conecta.ui.screens.perfil.PerfilScreen
 import co.edu.upb.conecta.ui.screens.splash.SplashScreen
 import co.edu.upb.conecta.ui.theme.UpbGradienteMarca
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
 
 private val rutasConBarraInferior = destinosBarraInferior.map { it.ruta }.toSet()
 private val rutasConFabChatbot = setOf(Rutas.INICIO, Rutas.NOTICIAS, Rutas.FORO)
@@ -200,9 +203,13 @@ fun UPBConectaNavHost() {
                 MapaScreen(mapaRepository = AppContainer.mapaRepository)
             }
             composable(Rutas.PERFIL) {
+                val scope = rememberCoroutineScope()
                 PerfilScreen(
                     usuarioRepository = AppContainer.usuarioRepository,
                     onCerrarSesion = {
+                        // Revoca la sesión en el backend; corre en un scope que
+                        // no depende de esta pantalla, que se cierra al navegar.
+                        scope.launch(NonCancellable) { AppContainer.authRepository.cerrarSesion() }
                         navController.navigate(Rutas.LOGIN) {
                             popUpTo(0) { inclusive = true }
                         }

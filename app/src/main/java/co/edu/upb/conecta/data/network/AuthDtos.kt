@@ -65,3 +65,16 @@ data class ConsentimientoDto(
     val mustConsent: Boolean,
     val pending: List<PendingConsentDto> = emptyList()
 )
+
+/** Cuerpo de `POST /auth/refresh` y `POST /auth/logout`. */
+data class RefreshRequestDto(
+    val refreshToken: String
+)
+
+/** Respuesta de `POST /auth/refresh`: un par nuevo (el refresh token usado ya no sirve). */
+data class RefreshResponseDto(
+    val ok: Boolean,
+    val session: SesionDto? = null,
+    val error: String? = null,
+    val message: String? = null
+)

@@ -20,11 +20,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +45,7 @@ import co.edu.upb.conecta.ui.components.EncabezadoSeccion
 import co.edu.upb.conecta.ui.components.EstadoVacio
 import co.edu.upb.conecta.ui.screens.foro.tiempoRelativo
 import co.edu.upb.conecta.ui.theme.UpbGradienteMarca
+import kotlinx.coroutines.delay
 
 /**
  * Bandeja de mensajes privados profesor↔estudiante. Lo que se ve depende
@@ -48,6 +54,9 @@ import co.edu.upb.conecta.ui.theme.UpbGradienteMarca
  *   nueva con cualquier estudiante del directorio.
  * - Estudiante: las conversaciones que le enviaron a él — no puede iniciar
  *   ninguna, solo responder (ver [ConversacionScreen]).
+ *
+ * La bandeja se recarga al entrar y luego cada [INTERVALO_BANDEJA_MS], para
+ * que aparezcan las conversaciones o respuestas que llegan desde otro celular.
  */
 @Composable
 fun MensajesScreen(
@@ -59,7 +68,21 @@ fun MensajesScreen(
 ) {
     val usuario = remember { usuarioRepository.obtenerUsuarioActual() }
     val esProfesor = usuario.rol == RolUsuario.PROFESOR
-    val conversaciones = remember { mensajeriaRepository.obtenerConversacionesDe(usuario) }
+    var conversaciones by remember { mutableStateOf<List<ConversacionChat>?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    // Se cancela solo al salir de la pantalla y vuelve a arrancar al regresar.
+    LaunchedEffect(usuario.id) {
+        while (true) {
+            mensajeriaRepository.obtenerConversacionesDe(usuario)
+                .onSuccess {
+                    conversaciones = it
+                    error = null
+                }
+                .onFailure { error = it.message ?: "No se pudieron cargar los mensajes." }
+            delay(INTERVALO_BANDEJA_MS)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         EncabezadoSeccion(
@@ -91,7 +114,24 @@ fun MensajesScreen(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        if (conversaciones.isEmpty()) {
+        val errorActual = error
+        if (errorActual != null) {
+            Text(
+                text = errorActual,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
+        val lista = conversaciones
+        if (lista == null) {
+            if (errorActual == null) {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (lista.isEmpty()) {
             EstadoVacio(
                 mensaje = if (esProfesor) {
                     "Aún no has iniciado ninguna conversación."
@@ -102,7 +142,7 @@ fun MensajesScreen(
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
-                items(conversaciones, key = { it.id }) { conversacion ->
+                items(lista, key = { it.id }) { conversacion ->
                     TarjetaConversacion(
                         conversacion = conversacion,
                         esProfesor = esProfesor,
@@ -171,3 +211,5 @@ private fun TarjetaConversacion(
         }
     }
 }
+
+private const val INTERVALO_BANDEJA_MS = 10_000L

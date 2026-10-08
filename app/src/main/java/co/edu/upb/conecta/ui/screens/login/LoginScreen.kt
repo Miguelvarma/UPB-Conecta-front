@@ -198,11 +198,12 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Cuenta de prueba del backend real (requiere \"npm run start:http\" corriendo):\n" +
-                "estudiante@upb.edu.co / S3cr3t!UPB\n\n" +
-                "Sin backend disponible, cambia AppContainer.authRepository a FakeAuthRepository " +
-                "para probar con datos simulados (contraseña upb2026; cualquier correo " +
-                "@upb.edu.co entra como estudiante, profesor.rueda@upb.edu.co como profesor).",
+            text = "Cuentas de prueba (contraseña S3cr3t!UPB):\n" +
+                "Profesor: profesor@upb.edu.co\n" +
+                "Estudiante: julian.vargas@upb.edu.co o estudiante@upb.edu.co\n\n" +
+                "Sin backend disponible, cambia AppContainer.authRepository y " +
+                "mensajeriaRepository a sus Fake (contraseña upb2026; " +
+                "profesor.rueda@upb.edu.co entra como profesor).",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
             textAlign = TextAlign.Center
