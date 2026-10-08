@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -29,9 +30,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,12 +47,15 @@ import androidx.compose.ui.unit.dp
 import co.edu.upb.conecta.data.repository.MensajeriaRepository
 import co.edu.upb.conecta.data.repository.UsuarioRepository
 import co.edu.upb.conecta.domain.model.RolUsuario
+import co.edu.upb.conecta.domain.model.Usuario
 import co.edu.upb.conecta.ui.components.EstadoVacio
 import co.edu.upb.conecta.ui.theme.UpbGradienteMarca
+import kotlinx.coroutines.launch
 
 /**
  * Formulario con el que un profesor inicia una conversación con un
- * estudiante del directorio ([MensajeriaRepository.obtenerEstudiantesDisponibles]).
+ * estudiante del directorio ([MensajeriaRepository.obtenerEstudiantesDisponibles];
+ * con el backend real, los estudiantes registrados en MongoDB Atlas).
  * Solo tiene sentido para [RolUsuario.PROFESOR] — si alguien más llega
  * aquí, se muestra un aviso en vez del formulario.
  */
@@ -82,12 +88,27 @@ fun NuevaConversacionScreen(
             return@Scaffold
         }
 
-        val estudiantes = remember { mensajeriaRepository.obtenerEstudiantesDisponibles() }
-        var estudianteSeleccionado by remember { mutableStateOf(estudiantes.firstOrNull()) }
+        var estudiantes by remember { mutableStateOf<List<Usuario>?>(null) }
+        var estudianteSeleccionado by remember { mutableStateOf<Usuario?>(null) }
         var asunto by remember { mutableStateOf("") }
         var mensaje by remember { mutableStateOf("") }
+        var error by remember { mutableStateOf<String?>(null) }
+        var enviando by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
 
-        val puedeEnviar = estudianteSeleccionado != null && asunto.isNotBlank() && mensaje.isNotBlank()
+        LaunchedEffect(Unit) {
+            mensajeriaRepository.obtenerEstudiantesDisponibles()
+                .onSuccess {
+                    estudiantes = it
+                    estudianteSeleccionado = it.firstOrNull()
+                }
+                .onFailure {
+                    estudiantes = emptyList()
+                    error = it.message ?: "No se pudo cargar la lista de estudiantes."
+                }
+        }
+
+        val puedeEnviar = !enviando && estudianteSeleccionado != null && asunto.isNotBlank() && mensaje.isNotBlank()
 
         Column(
             modifier = Modifier
@@ -99,9 +120,12 @@ fun NuevaConversacionScreen(
             Text("Estudiante", style = MaterialTheme.typography.labelLarge)
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (estudiantes.isEmpty()) {
+            val listaEstudiantes = estudiantes
+            if (listaEstudiantes == null) {
+                CircularProgressIndicator()
+            } else if (listaEstudiantes.isEmpty()) {
                 Text(
-                    "No hay estudiantes en el directorio de ejemplo.",
+                    "No hay estudiantes disponibles.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -110,7 +134,7 @@ fun NuevaConversacionScreen(
                     contentPadding = PaddingValues(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(estudiantes, key = { it.id }) { estudiante ->
+                    items(listaEstudiantes, key = { it.id }) { estudiante ->
                         FilterChip(
                             selected = estudianteSeleccionado?.id == estudiante.id,
                             onClick = { estudianteSeleccionado = estudiante },
@@ -176,17 +200,27 @@ fun NuevaConversacionScreen(
                     .background(colorBoton)
                     .clickable(enabled = puedeEnviar) {
                         val destino = estudianteSeleccionado ?: return@clickable
-                        val nueva = mensajeriaRepository.crearConversacion(
-                            profesor = usuario,
-                            estudianteId = destino.id,
-                            asunto = asunto.trim(),
-                            mensajeInicial = mensaje.trim()
-                        )
-                        onConversacionCreada(nueva.id)
+                        scope.launch {
+                            enviando = true
+                            mensajeriaRepository.crearConversacion(
+                                profesor = usuario,
+                                estudianteId = destino.id,
+                                asunto = asunto.trim(),
+                                mensajeInicial = mensaje.trim()
+                            )
+                                .onSuccess { nueva -> onConversacionCreada(nueva.id) }
+                                .onFailure { error = it.message ?: "No se pudo enviar el mensaje." }
+                            enviando = false
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text("Enviar", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (enviando) "Enviando..." else "Enviar", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+
+            error?.let {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
         }
     }

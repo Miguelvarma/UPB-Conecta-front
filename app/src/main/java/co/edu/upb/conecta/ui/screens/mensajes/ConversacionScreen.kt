@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,23 +32,29 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.edu.upb.conecta.data.repository.MensajeriaRepository
 import co.edu.upb.conecta.data.repository.UsuarioRepository
+import co.edu.upb.conecta.domain.model.ConversacionChat
 import co.edu.upb.conecta.domain.model.MensajeChat
 import co.edu.upb.conecta.domain.model.RolUsuario
 import co.edu.upb.conecta.ui.components.EstadoVacio
 import co.edu.upb.conecta.ui.screens.foro.tiempoRelativo
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
- * Chat de una conversación privada profesor↔estudiante. Solo se llega aquí
- * desde la bandeja de [MensajesScreen] de uno de los dos participantes —
- * este front preliminar no valida por sí mismo que quien abre la pantalla
- * sea uno de ellos (eso lo hará el backend con el JWT de sesión, ver
- * `ARQUITECTURA-INTEGRACION.md`).
+ * Chat de una conversación privada profesor↔estudiante. Que quien la abre
+ * sea uno de los dos participantes lo valida el backend con el token de
+ * sesión: a cualquier otro le responde como si no existiera.
+ *
+ * Mientras la pantalla está abierta, la conversación se recarga cada
+ * [INTERVALO_CHAT_MS] para mostrar lo que escribe el otro participante desde
+ * su celular (sin notificaciones push todavía).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,9 +66,47 @@ fun ConversacionScreen(
     modifier: Modifier = Modifier
 ) {
     val usuario = remember { usuarioRepository.obtenerUsuarioActual() }
-    var conversacion by remember(id) { mutableStateOf(mensajeriaRepository.obtenerConversacion(id)) }
+    var conversacion by remember(id) { mutableStateOf<ConversacionChat?>(null) }
+    var cargando by remember(id) { mutableStateOf(true) }
+    var aviso by remember { mutableStateOf<String?>(null) }
+    var enviando by remember { mutableStateOf(false) }
     var texto by remember { mutableStateOf("") }
     val estadoScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(id) {
+        while (true) {
+            mensajeriaRepository.obtenerConversacion(id)
+                .onSuccess {
+                    conversacion = it
+                    aviso = null
+                }
+                .onFailure { aviso = it.message ?: "No se pudo actualizar la conversación." }
+            cargando = false
+            delay(INTERVALO_CHAT_MS)
+        }
+    }
+
+    fun enviar() {
+        val actual = conversacion ?: return
+        val contenido = texto.trim()
+        if (contenido.isEmpty() || enviando) return
+        scope.launch {
+            enviando = true
+            mensajeriaRepository.enviarMensaje(actual.id, usuario, contenido)
+                .onSuccess { mensaje ->
+                    texto = ""
+                    aviso = null
+                    // Se muestra de inmediato, sin esperar la siguiente recarga.
+                    val vigente = conversacion
+                    if (vigente != null && vigente.mensajes.none { it.id == mensaje.id }) {
+                        conversacion = vigente.copy(mensajes = vigente.mensajes + mensaje)
+                    }
+                }
+                .onFailure { aviso = it.message ?: "No se pudo enviar el mensaje." }
+            enviando = false
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -91,24 +137,34 @@ fun ConversacionScreen(
         },
         bottomBar = {
             if (conversacion != null) {
-                BarraEnvioMensaje(
-                    valor = texto,
-                    onValorChange = { texto = it },
-                    onEnviar = {
-                        val idConversacion = conversacion?.id ?: return@BarraEnvioMensaje
-                        if (texto.isNotBlank()) {
-                            mensajeriaRepository.enviarMensaje(idConversacion, usuario, texto.trim())
-                            conversacion = mensajeriaRepository.obtenerConversacion(idConversacion)
-                            texto = ""
-                        }
+                Column {
+                    aviso?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
                     }
-                )
+                    BarraEnvioMensaje(
+                        valor = texto,
+                        onValorChange = { texto = it },
+                        onEnviar = { enviar() },
+                        habilitado = !enviando
+                    )
+                }
             }
         }
     ) { padding ->
         val conversacionActual = conversacion
         if (conversacionActual == null) {
-            EstadoVacio("No se encontró la conversación.", modifier = Modifier.padding(padding))
+            if (cargando) {
+                Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                EstadoVacio(aviso ?: "No se encontró la conversación.", modifier = Modifier.padding(padding))
+            }
             return@Scaffold
         }
 
@@ -185,7 +241,8 @@ private fun BarraEnvioMensaje(
     valor: String,
     onValorChange: (String) -> Unit,
     onEnviar: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    habilitado: Boolean = true
 ) {
     Surface(modifier = modifier, shadowElevation = 4.dp) {
         Row(
@@ -202,9 +259,11 @@ private fun BarraEnvioMensaje(
                 maxLines = 4
             )
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = onEnviar, enabled = valor.isNotBlank()) {
+            IconButton(onClick = onEnviar, enabled = habilitado && valor.isNotBlank()) {
                 Icon(Icons.Filled.Send, contentDescription = "Enviar mensaje")
             }
         }
     }
 }
+
+private const val INTERVALO_CHAT_MS = 4_000L

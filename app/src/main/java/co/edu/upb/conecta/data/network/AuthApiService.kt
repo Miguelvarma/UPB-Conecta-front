@@ -1,5 +1,6 @@
 package co.edu.upb.conecta.data.network
 
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -15,4 +16,16 @@ import retrofit2.http.POST
 interface AuthApiService {
     @POST("auth/login")
     suspend fun iniciarSesion(@Body body: LoginRequestDto): Response<LoginResponseDto>
+
+    /**
+     * Renueva la sesión con el refresh token (rotación, HU-45). Es `Call`
+     * síncrono, no `suspend`, porque lo invoca el `Authenticator` de OkHttp
+     * desde su propio hilo cuando una petición recibe 401 (ver [NetworkModule]).
+     */
+    @POST("auth/refresh")
+    fun renovarSesion(@Body body: RefreshRequestDto): Call<RefreshResponseDto>
+
+    /** Cierra la sesión en el servidor: revoca la cadena de refresh tokens. */
+    @POST("auth/logout")
+    suspend fun cerrarSesion(@Body body: RefreshRequestDto): Response<ErrorApiDto>
 }

@@ -4,6 +4,7 @@ import co.edu.upb.conecta.data.network.AuthApiService
 import co.edu.upb.conecta.data.network.LoginRequestDto
 import co.edu.upb.conecta.data.network.LoginResponseDto
 import co.edu.upb.conecta.data.network.PerfilDto
+import co.edu.upb.conecta.data.network.RefreshRequestDto
 import co.edu.upb.conecta.data.network.SessionStore
 import co.edu.upb.conecta.domain.model.MockProgramas
 import co.edu.upb.conecta.domain.model.Programa
@@ -62,6 +63,22 @@ class HttpAuthRepository(
         }
     }
 
+    /**
+     * Revoca la sesión en el backend (`POST /auth/logout`) y olvida los
+     * tokens. Si no hay red, igual se olvidan localmente: el usuario sale.
+     */
+    override suspend fun cerrarSesion() {
+        val refreshToken = SessionStore.refreshToken
+        SessionStore.limpiar()
+        if (refreshToken != null) {
+            try {
+                api.cerrarSesion(RefreshRequestDto(refreshToken))
+            } catch (error: Exception) {
+                // Sin red: la sesión expira sola en el servidor.
+            }
+        }
+    }
+
     private fun mensajeDeError(cuerpo: LoginResponseDto): String =
         when (cuerpo.error) {
             "invalid-credentials" -> "Correo o contraseña incorrectos."
@@ -80,14 +97,14 @@ class HttpAuthRepository(
  * un programa no reconocido en la UI es preferible a no poder entrar.
  */
 private fun PerfilDto.aUsuario(rol: RolUsuario): Usuario {
-    val programa = MockProgramas.todos.firstOrNull { it.nombre.equals(program, ignoreCase = true) }
-        ?: Programa(id = program.lowercase().replace(" ", "-"), nombre = program, facultad = "")
-
     return Usuario(
-        id = studentId ?: email,
+        // El correo, no el código estudiantil: es el mismo identificador que
+        // usa el backend (sujeto de la sesión, autor de cada mensaje), así la
+        // mensajería distingue los mensajes propios (ver HttpMensajeriaRepository).
+        id = email,
         nombre = name,
         correoInstitucional = email,
-        programa = programa,
+        programa = programaDesdeNombre(program),
         // Un profesor no tiene semestre; 0 es la misma convención que ya usa
         // `MockData.usuarioProfesor`, y la UI no lo muestra para ese rol.
         semestre = semester ?: 0,
@@ -95,6 +112,11 @@ private fun PerfilDto.aUsuario(rol: RolUsuario): Usuario {
         rol = rol
     )
 }
+
+/** Programa del catálogo local por nombre, o uno "de paso" con ese nombre (ver nota arriba). */
+internal fun programaDesdeNombre(nombre: String): Programa =
+    MockProgramas.todos.firstOrNull { it.nombre.equals(nombre, ignoreCase = true) }
+        ?: Programa(id = nombre.lowercase().replace(" ", "-"), nombre = nombre, facultad = "")
 
 /**
  * Traduce el rol del backend al [RolUsuario] de este front. El front solo

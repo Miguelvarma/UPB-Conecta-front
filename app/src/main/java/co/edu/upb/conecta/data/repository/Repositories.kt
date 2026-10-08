@@ -178,6 +178,9 @@ sealed class ResultadoLogin {
  */
 interface AuthRepository {
     suspend fun iniciarSesion(correoInstitucional: String, contrasena: String): ResultadoLogin
+
+    /** Cierra la sesión (en el backend, si la hay). */
+    suspend fun cerrarSesion() {}
 }
 
 class FakeAuthRepository(private val usuarioRepository: UsuarioRepository) : AuthRepository {
@@ -186,11 +189,9 @@ class FakeAuthRepository(private val usuarioRepository: UsuarioRepository) : Aut
     // login. El correo decide el rol: el de MockData.usuarioProfesor entra
     // como profesor, cualquier otro @upb.edu.co entra como estudiante.
     //
-    // El backend real (HttpAuthRepository) todavía no puede probar el rol de
-    // profesor: su contrato no incluye ningún rol en la respuesta de login
-    // (ver la nota en HttpAuthRepository) — este Fake sigue siendo la única
-    // forma de probar esa parte de la UI hasta que el equipo de backend lo
-    // agregue.
+    // Ojo: con este Fake no hay token de sesión, así que la mensajería real
+    // (HttpMensajeriaRepository) responde "sesión expirada". Para probar la
+    // mensajería sin backend, usa también FakeMensajeriaRepository en AppContainer.
     private val contrasenaDePrueba = "upb2026"
     private val dominioInstitucional = "@upb.edu.co"
 
@@ -222,48 +223,58 @@ class FakeAuthRepository(private val usuarioRepository: UsuarioRepository) : Aut
 /**
  * Puerto de mensajería privada profesor↔estudiante. Una [ConversacionChat]
  * solo la crea un profesor y solo la ven sus dos participantes — ver la
- * nota de visibilidad en el modelo de dominio. Igual que el resto: hoy
- * [FakeMensajeriaRepository] guarda todo en memoria; el día que el backend
- * tenga un contexto de mensajería, se agrega un `HttpMensajeriaRepository`.
+ * nota de visibilidad en el modelo de dominio. Dos implementaciones, mismo
+ * patrón `Fake*`/`Http*` que [AuthRepository]: [HttpMensajeriaRepository]
+ * (la real, contra `/messaging/...` del backend; es la que permite chatear
+ * entre dos celulares) y [FakeMensajeriaRepository] (en memoria, sin red).
+ *
+ * Todo es `suspend` y devuelve [Result]: la implementación real hace
+ * llamadas de red que pueden fallar. Un fallo trae un mensaje listo para la
+ * UI (ver [ErrorMensajeria]).
  */
 interface MensajeriaRepository {
     /** Conversaciones visibles para [usuario]: las que creó, si es profesor; las que le enviaron, si es estudiante. */
-    fun obtenerConversacionesDe(usuario: Usuario): List<ConversacionChat>
-    fun obtenerConversacion(id: String): ConversacionChat?
-    fun obtenerEstudiantesDisponibles(): List<Usuario>
+    suspend fun obtenerConversacionesDe(usuario: Usuario): Result<List<ConversacionChat>>
+
+    /** `null` si no existe o el usuario no participa en ella. */
+    suspend fun obtenerConversacion(id: String): Result<ConversacionChat?>
+    suspend fun obtenerEstudiantesDisponibles(): Result<List<Usuario>>
 
     /** Solo puede llamarla un [Usuario] con [RolUsuario.PROFESOR]. */
-    fun crearConversacion(
+    suspend fun crearConversacion(
         profesor: Usuario,
         estudianteId: String,
         asunto: String,
         mensajeInicial: String
-    ): ConversacionChat
+    ): Result<ConversacionChat>
 
-    fun enviarMensaje(conversacionId: String, autor: Usuario, contenido: String): MensajeChat?
+    suspend fun enviarMensaje(conversacionId: String, autor: Usuario, contenido: String): Result<MensajeChat>
 }
 
 class FakeMensajeriaRepository : MensajeriaRepository {
     private var conversaciones: List<ConversacionChat> = MockData.conversacionesChat
 
-    override fun obtenerConversacionesDe(usuario: Usuario): List<ConversacionChat> =
-        conversaciones
-            .filter {
-                if (usuario.rol == RolUsuario.PROFESOR) it.profesorId == usuario.id else it.estudianteId == usuario.id
-            }
-            .sortedByDescending { it.ultimoMensaje?.fecha }
+    override suspend fun obtenerConversacionesDe(usuario: Usuario): Result<List<ConversacionChat>> =
+        Result.success(
+            conversaciones
+                .filter {
+                    if (usuario.rol == RolUsuario.PROFESOR) it.profesorId == usuario.id else it.estudianteId == usuario.id
+                }
+                .sortedByDescending { it.ultimoMensaje?.fecha }
+        )
 
-    override fun obtenerConversacion(id: String): ConversacionChat? =
-        conversaciones.firstOrNull { it.id == id }
+    override suspend fun obtenerConversacion(id: String): Result<ConversacionChat?> =
+        Result.success(conversaciones.firstOrNull { it.id == id })
 
-    override fun obtenerEstudiantesDisponibles(): List<Usuario> = MockData.estudiantesDirectorio
+    override suspend fun obtenerEstudiantesDisponibles(): Result<List<Usuario>> =
+        Result.success(MockData.estudiantesDirectorio)
 
-    override fun crearConversacion(
+    override suspend fun crearConversacion(
         profesor: Usuario,
         estudianteId: String,
         asunto: String,
         mensajeInicial: String
-    ): ConversacionChat {
+    ): Result<ConversacionChat> {
         val estudiante = MockData.estudiantesDirectorio.firstOrNull { it.id == estudianteId }
         val nueva = ConversacionChat(
             id = "chat-${System.currentTimeMillis()}",
@@ -284,11 +295,13 @@ class FakeMensajeriaRepository : MensajeriaRepository {
             )
         )
         conversaciones = conversaciones + nueva
-        return nueva
+        return Result.success(nueva)
     }
 
-    override fun enviarMensaje(conversacionId: String, autor: Usuario, contenido: String): MensajeChat? {
-        if (conversaciones.none { it.id == conversacionId }) return null
+    override suspend fun enviarMensaje(conversacionId: String, autor: Usuario, contenido: String): Result<MensajeChat> {
+        if (conversaciones.none { it.id == conversacionId }) {
+            return Result.failure(ErrorMensajeria("La conversación no existe."))
+        }
 
         val mensaje = MensajeChat(
             id = "msg-${System.currentTimeMillis()}",
@@ -301,7 +314,7 @@ class FakeMensajeriaRepository : MensajeriaRepository {
         conversaciones = conversaciones.map { conversacion ->
             if (conversacion.id == conversacionId) conversacion.copy(mensajes = conversacion.mensajes + mensaje) else conversacion
         }
-        return mensaje
+        return Result.success(mensaje)
     }
 }
 
@@ -330,5 +343,9 @@ object AppContainer {
     val authRepository: AuthRepository = HttpAuthRepository(NetworkModule.authApi, usuarioRepository)
     // val authRepository: AuthRepository = FakeAuthRepository(usuarioRepository)
 
-    val mensajeriaRepository: MensajeriaRepository = FakeMensajeriaRepository()
+    // Mensajería real (conversaciones en el backend, compartidas entre
+    // celulares). Requiere haber iniciado sesión con HttpAuthRepository: usa
+    // su token. Para probar sin backend, cambia ambas líneas por sus Fake.
+    val mensajeriaRepository: MensajeriaRepository = HttpMensajeriaRepository(NetworkModule.mensajeriaApi)
+    // val mensajeriaRepository: MensajeriaRepository = FakeMensajeriaRepository()
 }
