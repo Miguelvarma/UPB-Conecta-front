@@ -102,31 +102,33 @@ private fun ContenidoMapa(mapa: MapaCampus) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Con una sola categoría (hoy solo edificios) no hay nada que filtrar.
-        if (categoriasPresentes.size > 1) LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(categoriasPresentes) { categoria ->
-                FilterChip(
-                    selected = categoria in categoriasVisibles,
-                    onClick = {
-                        categoriasVisibles = if (categoria in categoriasVisibles) {
-                            categoriasVisibles - categoria
-                        } else {
-                            categoriasVisibles + categoria
+        if (categoriasPresentes.size > 1) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(categoriasPresentes) { categoria ->
+                    FilterChip(
+                        selected = categoria in categoriasVisibles,
+                        onClick = {
+                            categoriasVisibles = if (categoria in categoriasVisibles) {
+                                categoriasVisibles - categoria
+                            } else {
+                                categoriasVisibles + categoria
+                            }
+                            if (seleccionado?.categoria == categoria) seleccionado = null
+                        },
+                        label = { Text(categoria.etiqueta) },
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(colorCategoria(categoria))
+                            )
                         }
-                        if (seleccionado?.categoria == categoria) seleccionado = null
-                    },
-                    label = { Text(categoria.etiqueta) },
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(colorCategoria(categoria))
-                        )
-                    }
-                )
+                    )
+                }
             }
         }
 
