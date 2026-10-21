@@ -70,6 +70,8 @@ object NetworkModule {
         .build()
 
     val mensajeriaApi: MensajeriaApiService = retrofitConSesion.create(MensajeriaApiService::class.java)
+
+    val campusApi: CampusApiService = retrofitConSesion.create(CampusApiService::class.java)
 }
 
 /** Agrega `Authorization: Bearer <accessToken>` si hay sesión. */

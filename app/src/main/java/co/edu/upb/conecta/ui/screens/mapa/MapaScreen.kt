@@ -1,32 +1,35 @@
 package co.edu.upb.conecta.ui.screens.mapa
 
+import android.content.Context
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,178 +37,243 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import co.edu.upb.conecta.data.repository.MapaRepository
 import co.edu.upb.conecta.domain.model.CategoriaPunto
+import co.edu.upb.conecta.domain.model.MapaCampus
+import co.edu.upb.conecta.domain.model.OrigenMapa
 import co.edu.upb.conecta.domain.model.PuntoInteres
 import co.edu.upb.conecta.ui.components.EncabezadoSeccion
 import co.edu.upb.conecta.ui.theme.AcentoAzul
 import co.edu.upb.conecta.ui.theme.AcentoMorado
 import co.edu.upb.conecta.ui.theme.AcentoVerde
-import co.edu.upb.conecta.ui.theme.UpbDorado
 import co.edu.upb.conecta.ui.theme.UpbAzulMarino
-import kotlin.math.roundToInt
+import co.edu.upb.conecta.ui.theme.UpbDorado
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.Marker
+import java.io.File
 
 /**
- * Mapa del campus — versión preliminar. En lugar de integrar un SDK de
- * mapas real (que requeriría una API key y un plano georreferenciado que
- * la Universidad aún no ha entregado), se dibuja un plano esquemático con
- * los puntos de interés ubicados por coordenadas relativas. El modelo
- * [PuntoInteres] ya está listo para mapearse a coordenadas geográficas
- * reales sin cambiar la capa de dominio.
+ * Mapa del campus sobre OpenStreetMap (osmdroid). Los contornos de los
+ * edificios los dibuja la propia cartografía de OSM; encima se pintan los
+ * marcadores del catálogo del backend (`GET /campus/map`) o, si no hay
+ * conexión o sesión real, la copia local de la app.
  */
 @Composable
 fun MapaScreen(mapaRepository: MapaRepository, modifier: Modifier = Modifier) {
-    val puntos = remember { mapaRepository.obtenerPuntosDeInteres() }
-    var puntoSeleccionado by remember { mutableStateOf<PuntoInteres?>(puntos.firstOrNull()) }
+    var mapa by remember { mutableStateOf<MapaCampus?>(null) }
+    LaunchedEffect(mapaRepository) { mapa = mapaRepository.obtenerMapa() }
 
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        item {
-            EncabezadoSeccion(
-                titulo = "Mapa del campus",
-                subtitulo = "Toca un punto para ver el detalle — plano esquemático preliminar"
-            )
-        }
-
-        item {
-            PlanoEsquematico(
-                puntos = puntos,
-                seleccionado = puntoSeleccionado,
-                onSeleccionar = { puntoSeleccionado = it },
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth()
-            )
-        }
-
-        puntoSeleccionado?.let { punto ->
-            item {
-                TarjetaPuntoSeleccionado(punto, modifier = Modifier.padding(16.dp))
+    Column(modifier = modifier.fillMaxSize()) {
+        EncabezadoSeccion(
+            titulo = "Mapa del campus",
+            subtitulo = "Toca un marcador o un elemento de la lista para ver el detalle"
+        )
+        val actual = mapa
+        if (actual == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
+        } else {
+            ContenidoMapa(actual)
         }
-
-        item {
-            Text(
-                text = "Todos los puntos",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
-        items(puntos, key = { it.id }) { punto ->
-            FilaPunto(
-                punto = punto,
-                seleccionado = punto.id == puntoSeleccionado?.id,
-                onClick = { puntoSeleccionado = punto },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
-        item { Box(modifier = Modifier.height(16.dp)) }
     }
 }
 
-private fun colorCategoriaPunto(categoria: CategoriaPunto): Color = when (categoria) {
-    CategoriaPunto.BLOQUE_ACADEMICO -> UpbAzulMarino
-    CategoriaPunto.BIBLIOTECA -> AcentoAzul
-    CategoriaPunto.BIENESTAR -> AcentoMorado
-    CategoriaPunto.COORDINACION -> UpbAzulMarino
-    CategoriaPunto.SERVICIOS -> UpbDorado
-    CategoriaPunto.DEPORTES -> AcentoVerde
-    CategoriaPunto.PARQUEADERO -> Color(0xFF616161)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContenidoMapa(mapa: MapaCampus) {
+    var categoriasVisibles by remember { mutableStateOf(CategoriaPunto.entries.toSet()) }
+    var seleccionado by remember { mutableStateOf<PuntoInteres?>(null) }
+    val categoriasPresentes = remember(mapa) { CategoriaPunto.entries.filter { c -> mapa.puntos.any { it.categoria == c } } }
+    val visibles = mapa.puntos.filter { it.categoria in categoriasVisibles }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (mapa.origen == OrigenMapa.LOCAL) {
+            Text(
+                text = "Sin conexión con el servidor: se muestran los datos guardados en la app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(categoriasPresentes) { categoria ->
+                FilterChip(
+                    selected = categoria in categoriasVisibles,
+                    onClick = {
+                        categoriasVisibles = if (categoria in categoriasVisibles) {
+                            categoriasVisibles - categoria
+                        } else {
+                            categoriasVisibles + categoria
+                        }
+                        if (seleccionado?.categoria == categoria) seleccionado = null
+                    },
+                    label = { Text(categoria.etiqueta) },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(colorCategoria(categoria))
+                        )
+                    }
+                )
+            }
+        }
+
+        MapaOsm(
+            mapa = mapa,
+            puntos = visibles,
+            seleccionado = seleccionado,
+            onSeleccionar = { seleccionado = it },
+            modifier = Modifier
+                .weight(0.6f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(16.dp))
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(0.4f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            seleccionado?.let { punto ->
+                item(key = "seleccionado") {
+                    TarjetaPuntoSeleccionado(punto, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                }
+            }
+            items(visibles, key = { it.id }) { punto ->
+                FilaPunto(
+                    punto = punto,
+                    seleccionado = punto.id == seleccionado?.id,
+                    onClick = { seleccionado = punto },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
 }
 
+/** El `MapView` de osmdroid dentro de Compose, atado al ciclo de vida de la pantalla. */
 @Composable
-private fun PlanoEsquematico(
+private fun MapaOsm(
+    mapa: MapaCampus,
     puntos: List<PuntoInteres>,
     seleccionado: PuntoInteres?,
     onSeleccionar: (PuntoInteres) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier
-            .aspectRatio(1f)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(16.dp)
-            ),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val anchoPx = constraints.maxWidth.toFloat()
-            val altoPx = constraints.maxHeight.toFloat()
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val mapView = remember { crearMapView(context, GeoPoint(mapa.centroLatitud, mapa.centroLongitud)) }
 
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                // Senderos esquemáticos, solo de referencia visual.
-                drawLine(
-                    color = Color.Gray.copy(alpha = 0.3f),
-                    start = Offset(size.width * 0.1f, size.height * 0.5f),
-                    end = Offset(size.width * 0.9f, size.height * 0.5f),
-                    strokeWidth = 6f,
-                    cap = StrokeCap.Round
-                )
-                drawLine(
-                    color = Color.Gray.copy(alpha = 0.3f),
-                    start = Offset(size.width * 0.5f, size.height * 0.1f),
-                    end = Offset(size.width * 0.5f, size.height * 0.9f),
-                    strokeWidth = 6f,
-                    cap = StrokeCap.Round
-                )
-            }
-
-            puntos.forEach { punto ->
-                Marcador(
-                    punto = punto,
-                    seleccionado = punto.id == seleccionado?.id,
-                    anchoPx = anchoPx,
-                    altoPx = altoPx,
-                    onClick = { onSeleccionar(punto) }
-                )
+    DisposableEffect(lifecycle, mapView) {
+        val observador = LifecycleEventObserver { _, evento ->
+            when (evento) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> Unit
             }
         }
+        lifecycle.addObserver(observador)
+        onDispose {
+            lifecycle.removeObserver(observador)
+            mapView.onDetach()
+        }
+    }
+
+    // Centrar el mapa solo cuando cambia la selección, no al filtrar.
+    LaunchedEffect(seleccionado?.id) {
+        seleccionado?.let { mapView.controller.animateTo(GeoPoint(it.latitud, it.longitud)) }
+    }
+
+    AndroidView(
+        factory = { mapView },
+        modifier = modifier,
+        update = { vista ->
+            vista.overlays.removeAll { it is Marker }
+            puntos.forEach { punto ->
+                val marcador = Marker(vista).apply {
+                    position = GeoPoint(punto.latitud, punto.longitud)
+                    title = punto.nombre
+                    snippet = punto.descripcion
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = iconoMarcador(vista.context, punto.categoria, punto.id == seleccionado?.id)
+                    setOnMarkerClickListener { _, _ ->
+                        onSeleccionar(punto)
+                        true
+                    }
+                }
+                vista.overlays.add(marcador)
+            }
+            vista.invalidate()
+        }
+    )
+}
+
+private fun crearMapView(context: Context, centro: GeoPoint): MapView {
+    // La política de uso de los mosaicos de OSM exige identificar la app.
+    // La caché va en el directorio privado de la app: no pide permisos.
+    Configuration.getInstance().apply {
+        userAgentValue = context.packageName
+        osmdroidBasePath = File(context.cacheDir, "osmdroid")
+        osmdroidTileCache = File(osmdroidBasePath, "tiles")
+    }
+    return MapView(context).apply {
+        setTileSource(TileSourceFactory.MAPNIK)
+        setMultiTouchControls(true)
+        zoomController.setVisibility(CustomZoomButtonsController.Visibility.SHOW_AND_FADEOUT)
+        minZoomLevel = 15.0
+        maxZoomLevel = 20.0
+        controller.setZoom(18.0)
+        controller.setCenter(centro)
+        // Atribución obligatoria de OpenStreetMap.
+        overlays.add(CopyrightOverlay(context))
     }
 }
 
-@Composable
-private fun Marcador(
-    punto: PuntoInteres,
-    seleccionado: Boolean,
-    anchoPx: Float,
-    altoPx: Float,
-    onClick: () -> Unit
-) {
-    val density = LocalDensity.current
-    val tamanoDp = if (seleccionado) 22.dp else 16.dp
-    val tamanoPx = with(density) { tamanoDp.toPx() }
-    val color = colorCategoriaPunto(punto.categoria)
+/** Círculo del color de la categoría, más grande y con borde si está seleccionado. */
+private fun iconoMarcador(context: Context, categoria: CategoriaPunto, seleccionado: Boolean): Drawable {
+    val densidad = context.resources.displayMetrics.density
+    val tamano = ((if (seleccionado) 26 else 18) * densidad).toInt()
+    return GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(colorCategoria(categoria).toArgb())
+        setStroke(((if (seleccionado) 3 else 2) * densidad).toInt(), Color.White.toArgb())
+        setSize(tamano, tamano)
+    }
+}
 
-    Box(
-        modifier = Modifier
-            .offset {
-                IntOffset(
-                    x = (anchoPx * punto.x - tamanoPx / 2f).roundToInt(),
-                    y = (altoPx * punto.y - tamanoPx / 2f).roundToInt()
-                )
-            }
-            .size(tamanoDp)
-            .clip(CircleShape)
-            .background(color)
-            .border(
-                width = if (seleccionado) 2.dp else 0.dp,
-                color = Color.White,
-                shape = CircleShape
-            )
-            .clickable(onClick = onClick)
-    )
+private fun colorCategoria(categoria: CategoriaPunto): Color = when (categoria) {
+    CategoriaPunto.EDIFICIO -> UpbAzulMarino
+    CategoriaPunto.CAFETERIA -> UpbDorado
+    CategoriaPunto.BIBLIOTECA -> AcentoAzul
+    CategoriaPunto.BIENESTAR -> AcentoMorado
+    CategoriaPunto.COORDINACION -> Color(0xFF00838F)
+    CategoriaPunto.PUNTO_ATENCION -> Color(0xFFC62828)
+    CategoriaPunto.PARQUEADERO -> Color(0xFF616161)
+    CategoriaPunto.SANITARIO -> AcentoVerde
 }
 
 @Composable
@@ -249,12 +317,12 @@ private fun FilaPunto(
                 modifier = Modifier
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(colorCategoriaPunto(punto.categoria))
+                    .background(colorCategoria(punto.categoria))
             )
             Column {
                 Text(text = punto.nombre, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = punto.categoria.etiqueta,
+                    text = punto.descripcion,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

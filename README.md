@@ -24,7 +24,7 @@ Cuando el backend exponga una API (REST/GraphQL sobre los contextos `ingestion`,
 - **Noticias**: el apartado con scrolling pedido explícitamente — carrusel horizontal de destacadas + listado vertical completo (`LazyColumn`/`LazyRow`).
 - **Foro**: hilos con identidad verificada (insignia), estado de moderación automática visible (aprobado / en revisión) y respuestas — cualquier usuario logueado puede comentar en un hilo.
 - **Mensajería privada profesor↔estudiante**: un profesor puede iniciar una conversación con cualquier estudiante registrado en el backend; el estudiante la ve y puede responder **desde otro celular**. Las conversaciones viven en el backend (`/messaging/...`, MongoDB Atlas) vía `HttpMensajeriaRepository`; la bandeja se actualiza cada 10 s y el chat abierto cada 4 s. Cada conversación solo la ven sus dos participantes — lo valida el backend con el token de sesión, que `NetworkModule` adjunta y renueva automáticamente (`domain/model/Mensajeria.kt`, `data/repository/MensajeriaRepository`).
-- **Mapa del campus**: plano esquemático preliminar con puntos de interés tocables (ver nota abajo).
+- **Mapa del campus**: mapa real del campus de Floridablanca sobre OpenStreetMap, con los edificios A a L, parqueaderos y puntos de interés filtrables por categoría (ver nota abajo).
 - **Chatbot de preguntas frecuentes**: UI de chat con preguntas sugeridas y respuesta simulada por coincidencia de texto.
 - **Notificaciones** y **Perfil** (con identidad institucional verificada, y "Cerrar sesión" para volver al login).
 
@@ -41,7 +41,7 @@ Toda la app usa **datos de ejemplo** (`data/mock/MockData.kt`) — nombres, empr
 
 - **`minSdk = 26`**: para poder usar `java.time.LocalDate`/`LocalDateTime` nativo (fechas de cierre, timestamps del foro) sin agregar la librería de *core library desugaring*. Si necesitas soportar Android 7 hacia abajo, se puede bajar a `minSdk = 24` agregando esa dependencia.
 - **Sin Hilt/Koin**: `AppContainer` (en `data/repository/Repositories.kt`) es un contenedor de dependencias manual y simple, a propósito, para que el proyecto abra y muestre algo en Android Studio sin resolver una librería de inyección de dependencias primero. Es el punto natural para introducir Hilt más adelante.
-- **Mapa del campus**: es un plano esquemático dibujado en Compose (`Canvas` + puntos posicionados por coordenadas relativas), no un SDK de mapas real — la Universidad aún no tiene un plano georreferenciado público ni se pidió una API key de Google Maps. El modelo `PuntoInteres` ya está listo para mapearse a coordenadas geográficas reales cuando corresponda.
+- **Mapa del campus**: usa osmdroid (OpenStreetMap), que no necesita API key. Los contornos de los edificios los dibuja la cartografía de OSM; los marcadores salen de `GET /campus/map` del backend y, si no hay sesión real o conexión, de la copia local `MockData.mapaCampus`. Los niveles de cada edificio y la ubicación interna de cafeterías, biblioteca, coordinaciones y baños son provisionales.
 - **Colores de marca**: la paleta (azul marino + degradado rosa→morado + rojo institucional) se calcó a ojo de capturas de pantalla de las apps institucionales de la UPB (menú y login), no de un manual de marca con códigos exactos. Está centralizada en `ui/theme/Color.kt` (y el degradado `UpbGradienteMarca` en `ui/theme/Theme.kt`) — reemplaza esos valores por los códigos exactos cuando tengas el manual de identidad corporativa a mano.
 - **Ícono de lanzador / splash nativo**: una sola marca en degradado rosa→morado (`res/drawable/ic_launcher_foreground.xml`) generada para este preliminar — es también lo que Android 12+ muestra automáticamente como splash nativo antes de que cargue el primer Composable, por eso se simplificó a una sola pieza en vez de anillos. Reemplazable desde Android Studio con *File → New → Image Asset* cuando exista el logo oficial de UPB Conecta.
 - **Chatbot**: responde por coincidencia simple de texto sobre la lista de preguntas frecuentes — no hay NLP ni backend real todavía.
@@ -51,5 +51,5 @@ Toda la app usa **datos de ejemplo** (`data/mock/MockData.kt`) — nombres, empr
 
 1. Sincronizar en Android Studio y correr en un emulador para validar visualmente.
 2. Reemplazar `data/mock/MockData.kt` por adaptadores reales contra el backend a medida que se implementen los contextos `classification`, `feed`, `moderation`, etc.
-3. Cambiar el mapa esquemático por un mapa real cuando exista el plano/API.
+3. Confirmar con la Universidad los niveles y la ubicación interna de los puntos de interés del mapa.
 4. Sustituir la paleta de colores por el manual de marca oficial (códigos hexadecimales exactos).

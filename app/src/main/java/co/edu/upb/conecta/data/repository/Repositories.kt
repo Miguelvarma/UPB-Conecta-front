@@ -113,12 +113,13 @@ class FakeNotificacionesRepository : NotificacionesRepository {
         MockData.notificaciones.sortedByDescending { it.fecha }
 }
 
+/** Mapa del campus: edificios y puntos de interés con coordenadas reales. */
 interface MapaRepository {
-    fun obtenerPuntosDeInteres(): List<PuntoInteres>
+    suspend fun obtenerMapa(): MapaCampus
 }
 
 class FakeMapaRepository : MapaRepository {
-    override fun obtenerPuntosDeInteres(): List<PuntoInteres> = MockData.puntosInteres
+    override suspend fun obtenerMapa(): MapaCampus = MockData.mapaCampus
 }
 
 interface ChatbotRepository {
@@ -331,7 +332,9 @@ object AppContainer {
     val noticiasRepository: NoticiasRepository = FakeNoticiasRepository()
     val foroRepository: ForoRepository = FakeForoRepository()
     val notificacionesRepository: NotificacionesRepository = FakeNotificacionesRepository()
-    val mapaRepository: MapaRepository = FakeMapaRepository()
+    // Mapa real (GET /campus/map). Si no hay sesión real o falla la red,
+    // HttpMapaRepository muestra la copia local de MockData.mapaCampus.
+    val mapaRepository: MapaRepository = HttpMapaRepository(NetworkModule.campusApi, FakeMapaRepository())
     val chatbotRepository: ChatbotRepository = FakeChatbotRepository()
     val usuarioRepository: UsuarioRepository = FakeUsuarioRepository()
 
