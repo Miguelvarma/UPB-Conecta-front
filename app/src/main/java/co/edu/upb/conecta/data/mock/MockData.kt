@@ -387,41 +387,26 @@ object MockData {
      * Copia local del catálogo del campus de Floridablanca (mismo contenido
      * que `backend/config/campus-catalog.json`). La app la usa cuando no
      * puede leer `GET /campus/map`: sin sesión real o sin conexión.
-     * Coordenadas: centro de cada edificio según OpenStreetMap. Los niveles
-     * y la ubicación interna de cafeterías, biblioteca, etc. son provisionales.
+     * Solo los edificios, con el centro de cada uno según OpenStreetMap.
      */
     val mapaCampus: MapaCampus = MapaCampus(
         nombre = "UPB Seccional Bucaramanga (campus Floridablanca)",
         centroLatitud = 7.0381,
         centroLongitud = -73.0708,
         puntos = listOf(
-            PuntoInteres("edificio-a", "Edificio A", CategoriaPunto.EDIFICIO, "Zona central · 4 niveles", 7.038245, -73.07143),
-            PuntoInteres("edificio-b", "Edificio B", CategoriaPunto.EDIFICIO, "Zona central · 3 niveles", 7.038098, -73.071618),
-            PuntoInteres("edificio-c", "Edificio C", CategoriaPunto.EDIFICIO, "Zona central · 3 niveles", 7.037989, -73.07141),
-            PuntoInteres("edificio-j", "Edificio J", CategoriaPunto.EDIFICIO, "Zona central · 3 niveles", 7.037684, -73.071563),
-            PuntoInteres("templo", "Templo Universitario María Reina de la Paz", CategoriaPunto.EDIFICIO, "Zona central · 1 nivel", 7.038403, -73.07176),
-            PuntoInteres("edificio-d", "Edificio D", CategoriaPunto.EDIFICIO, "Zona sur · 3 niveles", 7.038055, -73.070875),
-            PuntoInteres("edificio-e", "Edificio E", CategoriaPunto.EDIFICIO, "Zona sur · 3 niveles", 7.037947, -73.070621),
-            PuntoInteres("edificio-f", "Edificio F", CategoriaPunto.EDIFICIO, "Zona sur · 3 niveles", 7.03774, -73.07075),
-            PuntoInteres("edificio-g", "Edificio G", CategoriaPunto.EDIFICIO, "Zona sur · 3 niveles", 7.037585, -73.070812),
-            PuntoInteres("edificio-h", "Edificio H", CategoriaPunto.EDIFICIO, "Zona sur · 3 niveles", 7.037782, -73.07033),
-            PuntoInteres("edificio-i", "Edificio I", CategoriaPunto.EDIFICIO, "Zona oriental · 3 niveles", 7.038182, -73.06968),
-            PuntoInteres("edificio-k", "Edificio K", CategoriaPunto.EDIFICIO, "Zona oriental · 4 niveles", 7.038694, -73.069657),
-            PuntoInteres("edificio-l", "Edificio L", CategoriaPunto.EDIFICIO, "Zona oriental · 3 niveles", 7.038037, -73.069175),
-            PuntoInteres("poi-cafeteria-a", "Cafetería Edificio A", CategoriaPunto.CAFETERIA, "Edificio A, planta baja", 7.038275, -73.0714),
-            PuntoInteres("poi-cafeteria-k", "Cafetería Edificio K", CategoriaPunto.CAFETERIA, "Edificio K, planta baja", 7.038664, -73.069697),
-            PuntoInteres("poi-biblioteca", "Biblioteca", CategoriaPunto.BIBLIOTECA, "Edificio K, nivel 1", 7.038724, -73.069617),
-            PuntoInteres("poi-bienestar", "Bienestar Universitario", CategoriaPunto.BIENESTAR, "Edificio D, planta baja", 7.038055, -73.070875),
-            PuntoInteres("poi-coord-sistemas", "Coordinación de Ingeniería de Sistemas", CategoriaPunto.COORDINACION, "Edificio A, nivel 2", 7.038245, -73.07143),
-            PuntoInteres("poi-coord-industrial", "Coordinación de Ingeniería Industrial", CategoriaPunto.COORDINACION, "Edificio A, nivel 3", 7.038225, -73.07145),
-            PuntoInteres("poi-admisiones", "Admisiones y Registro", CategoriaPunto.PUNTO_ATENCION, "Edificio A, nivel 1", 7.038265, -73.07145),
-            PuntoInteres("poi-bano-a0", "Baños Edificio A, planta baja", CategoriaPunto.SANITARIO, "Edificio A, planta baja", 7.038215, -73.0714),
-            PuntoInteres("poi-bano-a2", "Baños Edificio A, nivel 2", CategoriaPunto.SANITARIO, "Edificio A, nivel 2", 7.038215, -73.0714),
-            PuntoInteres("poi-bano-k", "Baños Edificio K", CategoriaPunto.SANITARIO, "Edificio K, planta baja", 7.038694, -73.069597),
-            PuntoInteres("poi-parqueadero-norte", "Parqueadero norte", CategoriaPunto.PARQUEADERO, "Al aire libre", 7.039793, -73.072691),
-            PuntoInteres("poi-parqueadero-occidental", "Parqueadero de varios pisos (occidente)", CategoriaPunto.PARQUEADERO, "Al aire libre", 7.038202, -73.07248),
-            PuntoInteres("poi-parqueadero-sur", "Parqueadero junto a las canchas", CategoriaPunto.PARQUEADERO, "Al aire libre", 7.03914, -73.07311),
-            PuntoInteres("poi-parqueadero-oriental", "Parqueadero de varios pisos (oriente)", CategoriaPunto.PARQUEADERO, "Al aire libre", 7.038458, -73.069882)
+            PuntoInteres("edificio-a", "Edificio A", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038245, -73.07143),
+            PuntoInteres("edificio-b", "Edificio B", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038098, -73.071618),
+            PuntoInteres("edificio-c", "Edificio C", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.037989, -73.07141),
+            PuntoInteres("edificio-j", "Edificio J", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.037684, -73.071563),
+            PuntoInteres("templo", "Templo Universitario María Reina de la Paz", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038403, -73.07176),
+            PuntoInteres("edificio-d", "Edificio D", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038055, -73.070875),
+            PuntoInteres("edificio-e", "Edificio E", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.037947, -73.070621),
+            PuntoInteres("edificio-f", "Edificio F", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.03774, -73.07075),
+            PuntoInteres("edificio-g", "Edificio G", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.037585, -73.070812),
+            PuntoInteres("edificio-h", "Edificio H", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.037782, -73.07033),
+            PuntoInteres("edificio-i", "Edificio I", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038182, -73.06968),
+            PuntoInteres("edificio-k", "Edificio K", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038694, -73.069657),
+            PuntoInteres("edificio-l", "Edificio L", CategoriaPunto.EDIFICIO, "Campus Floridablanca", 7.038037, -73.069175)
         ),
         origen = OrigenMapa.LOCAL
     )
