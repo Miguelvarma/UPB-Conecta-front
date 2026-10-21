@@ -200,10 +200,7 @@ fun LoginScreen(
         Text(
             text = "Cuentas de prueba (contraseña S3cr3t!UPB):\n" +
                 "Profesor: profesor@upb.edu.co\n" +
-                "Estudiante: julian.vargas@upb.edu.co o estudiante@upb.edu.co\n\n" +
-                "Sin backend disponible, cambia AppContainer.authRepository y " +
-                "mensajeriaRepository a sus Fake (contraseña upb2026; " +
-                "profesor.rueda@upb.edu.co entra como profesor).",
+                "Estudiante: julian.vargas@upb.edu.co o estudiante@upb.edu.co",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
             textAlign = TextAlign.Center
