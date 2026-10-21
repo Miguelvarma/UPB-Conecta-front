@@ -213,7 +213,7 @@ private fun MapaOsm(
                     title = punto.nombre
                     snippet = punto.descripcion
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    icon = iconoMarcador(vista.context, punto.categoria, punto.id == seleccionado?.id)
+                    icon = iconoMarcador(vista.context, colorPunto(punto), punto.id == seleccionado?.id)
                     setOnMarkerClickListener { _, _ ->
                         onSeleccionar(punto)
                         true
@@ -247,17 +247,40 @@ private fun crearMapView(context: Context, centro: GeoPoint): MapView {
     }
 }
 
-/** Círculo del color de la categoría, más grande y con borde si está seleccionado. */
-private fun iconoMarcador(context: Context, categoria: CategoriaPunto, seleccionado: Boolean): Drawable {
+/** Círculo del color del punto, más grande y con borde si está seleccionado. */
+private fun iconoMarcador(context: Context, color: Color, seleccionado: Boolean): Drawable {
     val densidad = context.resources.displayMetrics.density
     val tamano = ((if (seleccionado) 26 else 18) * densidad).toInt()
     return GradientDrawable().apply {
         shape = GradientDrawable.OVAL
-        setColor(colorCategoria(categoria).toArgb())
+        setColor(color.toArgb())
         setStroke(((if (seleccionado) 3 else 2) * densidad).toInt(), Color.White.toArgb())
         setSize(tamano, tamano)
     }
 }
+
+/**
+ * Color de cada edificio en el mapa y en la lista. Para cambiar uno, edita su
+ * valor `Color(0xFFRRGGBB)` (RR, GG y BB en hexadecimal). Un edificio que no
+ * esté aquí usa el color de su categoría.
+ */
+private val coloresEdificio: Map<String, Color> = mapOf(
+    "edificio-a" to Color(0xFFE53935), // rojo
+    "edificio-b" to Color(0xFFFB8C00), // naranja
+    "edificio-c" to Color(0xFFFDD835), // amarillo
+    "edificio-d" to Color(0xFF43A047), // verde
+    "edificio-e" to Color(0xFF00ACC1), // cian
+    "edificio-f" to Color(0xFF1E88E5), // azul
+    "edificio-g" to Color(0xFF5E35B1), // violeta
+    "edificio-h" to Color(0xFFD81B60), // rosa
+    "edificio-i" to Color(0xFF6D4C41), // café
+    "edificio-j" to Color(0xFF00897B), // verde azulado
+    "edificio-k" to Color(0xFF8E24AA), // morado
+    "edificio-l" to Color(0xFF7CB342), // verde claro
+    "templo" to Color(0xFFD9A21B) // dorado UPB
+)
+
+private fun colorPunto(punto: PuntoInteres): Color = coloresEdificio[punto.id] ?: colorCategoria(punto.categoria)
 
 private fun colorCategoria(categoria: CategoriaPunto): Color = when (categoria) {
     CategoriaPunto.EDIFICIO -> UpbAzulMarinoClaro
@@ -311,7 +334,7 @@ private fun FilaPunto(
                 modifier = Modifier
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(colorCategoria(punto.categoria))
+                    .background(colorPunto(punto))
             )
             Column {
                 Text(text = punto.nombre, style = MaterialTheme.typography.titleSmall)
