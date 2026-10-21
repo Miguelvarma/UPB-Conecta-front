@@ -48,13 +48,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import co.edu.upb.conecta.data.repository.MapaRepository
 import co.edu.upb.conecta.domain.model.CategoriaPunto
 import co.edu.upb.conecta.domain.model.MapaCampus
-import co.edu.upb.conecta.domain.model.OrigenMapa
 import co.edu.upb.conecta.domain.model.PuntoInteres
 import co.edu.upb.conecta.ui.components.EncabezadoSeccion
 import co.edu.upb.conecta.ui.theme.AcentoAzul
 import co.edu.upb.conecta.ui.theme.AcentoMorado
 import co.edu.upb.conecta.ui.theme.AcentoVerde
-import co.edu.upb.conecta.ui.theme.UpbAzulMarino
+import co.edu.upb.conecta.ui.theme.UpbAzulMarinoClaro
 import co.edu.upb.conecta.ui.theme.UpbDorado
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -69,7 +68,8 @@ import java.io.File
  * Mapa del campus sobre OpenStreetMap (osmdroid). Los contornos de los
  * edificios los dibuja la propia cartografía de OSM; encima se pintan los
  * marcadores del catálogo del backend (`GET /campus/map`) o, si no hay
- * conexión o sesión real, la copia local de la app.
+ * conexión o sesión real, la copia local de la app (sin aviso en pantalla:
+ * para el usuario el mapa es el mismo).
  */
 @Composable
 fun MapaScreen(mapaRepository: MapaRepository, modifier: Modifier = Modifier) {
@@ -101,15 +101,6 @@ private fun ContenidoMapa(mapa: MapaCampus) {
     val visibles = mapa.puntos.filter { it.categoria in categoriasVisibles }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (mapa.origen == OrigenMapa.LOCAL) {
-            Text(
-                text = "Sin conexión con el servidor: se muestran los datos guardados en la app.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -266,7 +257,7 @@ private fun iconoMarcador(context: Context, categoria: CategoriaPunto, seleccion
 }
 
 private fun colorCategoria(categoria: CategoriaPunto): Color = when (categoria) {
-    CategoriaPunto.EDIFICIO -> UpbAzulMarino
+    CategoriaPunto.EDIFICIO -> UpbAzulMarinoClaro
     CategoriaPunto.CAFETERIA -> UpbDorado
     CategoriaPunto.BIBLIOTECA -> AcentoAzul
     CategoriaPunto.BIENESTAR -> AcentoMorado
