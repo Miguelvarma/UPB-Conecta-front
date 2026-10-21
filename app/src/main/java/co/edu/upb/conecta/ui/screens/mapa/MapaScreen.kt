@@ -101,7 +101,8 @@ private fun ContenidoMapa(mapa: MapaCampus) {
     val visibles = mapa.puntos.filter { it.categoria in categoriasVisibles }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        LazyRow(
+        // Con una sola categoría (hoy solo edificios) no hay nada que filtrar.
+        if (categoriasPresentes.size > 1) LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
