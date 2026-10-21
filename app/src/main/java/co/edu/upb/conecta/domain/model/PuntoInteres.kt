@@ -1,26 +1,43 @@
 package co.edu.upb.conecta.domain.model
 
+/**
+ * Categorías del mapa. Además de los edificios, son las siete categorías de
+ * punto de interés del backend (`PoiCategory` en el contexto `campus`).
+ */
 enum class CategoriaPunto(val etiqueta: String) {
-    BLOQUE_ACADEMICO("Bloque académico"),
+    EDIFICIO("Edificios"),
+    CAFETERIA("Cafeterías"),
     BIBLIOTECA("Biblioteca"),
-    BIENESTAR("Bienestar universitario"),
-    COORDINACION("Coordinación de programa"),
-    SERVICIOS("Servicios / cafetería"),
-    DEPORTES("Zona deportiva"),
-    PARQUEADERO("Parqueadero")
+    BIENESTAR("Bienestar"),
+    COORDINACION("Coordinaciones"),
+    PUNTO_ATENCION("Atención"),
+    PARQUEADERO("Parqueaderos"),
+    SANITARIO("Baños")
 }
 
-/**
- * Punto de interés del campus. [x] e [y] son coordenadas relativas (0f..1f)
- * sobre el lienzo del mapa preliminar — ver MapaScreen. Cuando se integre un
- * mapa real (p. ej. Google Maps / plano georreferenciado), esto se traduce
- * a coordenadas geográficas o a un mapa de imagen con puntos ancla.
- */
+/** Punto del mapa del campus, en coordenadas geográficas (WGS84, grados). */
 data class PuntoInteres(
     val id: String,
     val nombre: String,
     val categoria: CategoriaPunto,
     val descripcion: String,
-    val x: Float,
-    val y: Float
+    val latitud: Double,
+    val longitud: Double
+)
+
+/** De dónde salieron los datos del mapa que se está mostrando. */
+enum class OrigenMapa {
+    /** `GET /campus/map` del backend. */
+    SERVIDOR,
+
+    /** Copia guardada en la app (sin sesión real o sin conexión). */
+    LOCAL
+}
+
+data class MapaCampus(
+    val nombre: String,
+    val centroLatitud: Double,
+    val centroLongitud: Double,
+    val puntos: List<PuntoInteres>,
+    val origen: OrigenMapa
 )

@@ -3,6 +3,8 @@
 
     <!-- Necesario desde que existe HttpAuthRepository (POST /auth/login contra el backend). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- osmdroid la usa para decidir si descarga mosaicos del mapa o usa los guardados. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"

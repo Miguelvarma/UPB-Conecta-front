@@ -67,5 +67,8 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp.logging.interceptor)
 
+    // Mapa del campus sobre OpenStreetMap (sin API key ni cuenta de facturación).
+    implementation(libs.osmdroid.android)
+
     debugImplementation(libs.androidx.ui.tooling)
 }
